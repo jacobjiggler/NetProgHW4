@@ -50,6 +50,7 @@ int main(int argc , char *argv[])
     std::string port = str.substr(0,mid_index);
     std::string command = str.substr(mid_index+1, str.length() - mid_index);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    std::cout << "sockfd " << sockfd << std::endl;
     if( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0 )
     {
         perror("setsockopt");
@@ -64,33 +65,33 @@ int main(int argc , char *argv[])
      if (bind(sockfd, (struct sockaddr *) &serv_addr,
               sizeof(serv_addr)) < 0)
               std::cout << "ERROR on binding" << std::endl;
-     if (listen(sockfd,5) == -1){
+     if (listen(sockfd,3  ) == -1){
      std::cout<< "Server-listen() error lol!" << std::endl;
      exit(1);
 }
+    if (sockfd > 0)
+      FD_SET(sockfd, &rfds);
+
      if (sockfd > maxfd)
       maxfd = sockfd;
-	     FD_SET(sockfd, &rfds);
 
     struct socket_info temp_sockinfo;
     temp_sockinfo.serv_addr = serv_addr;
     temp_sockinfo.command = command;
      //add to map
-     sockets[portno] = temp_sockinfo;
+     sockets[sockfd] = temp_sockinfo;
   }
 
 
 
   //while loop forever
-  it = sockets.begin();
   while(true) {
     //select or poll to accept connections
-
-    if (select(maxfd + 1, &rfds, NULL, NULL, NULL) == -1){
+    if (select(maxfd + 1, &rfds, NULL, NULL, NULL) < 0){
       perror("Server-select() error lol!");
       exit(1);
     }
-
+    it = sockets.begin();
     /*run through the existing connections looking for data to be read*/
     for(it = sockets.begin(); it!=sockets.end(); it++)
     {
@@ -98,38 +99,40 @@ int main(int argc , char *argv[])
         { /* we got one... */
              /* handle new connections */
           socklen_t addrlen = sizeof(it->second.serv_addr);
-          std::cout<< "ayo2" << std::endl;
-
+          //accept
           int newfd = accept(it->first, (struct sockaddr *)&(it->second.serv_addr), &addrlen);
-          std::cout<< newfd << std::endl;
-          if (newfd)
+          if (!(newfd>0))
           {
               printf("Server-accept() error lol!\n");
-              std::cout<< "hehehe1" << std::endl;
-
           }
           else
           {
               printf("Server-accept() is OK...\n");
-              std::cout<< "hehehe2" << std::endl;
+              //fork
+              pid_t pid = fork();
+              //if child
+              if (pid == 0)
+              {
+                // child process
 
+                dup2(newfd, STDIN_FILENO);
+                dup2(newfd, STDOUT_FILENO);
+
+                //execl command
+                execl("/bin/sh", "/bin/sh", "-c", it->second.command.c_str(), NULL);
+                //kill myself
+                exit(1);
+              }
+              else if (pid > 0){
+              //else
+                //add to children array
+              }
           }
-      //accept
-      //fork
-      //if child
-        //dup2(socket, STDIN_FILENO);
-        //dup2(socket, STDOUT_FILENO);
 
-        //execl command
-        //kill myself
-      //else
-        //add to children array
 
 
   }
-  it++;
-  if (it == sockets.end())
-    it = sockets.begin();
+
 }
 }
   //eventually wait on children
