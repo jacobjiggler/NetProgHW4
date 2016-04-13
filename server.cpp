@@ -15,12 +15,6 @@
 
 
 
-
-//todo array of multiple serv_addr's
-//use this http://www.binarytides.com/multiple-socket-connections-fdset-select-linux/
-
-
-
 struct socket_info {
   struct sockaddr_in serv_addr;
   std::string command;
@@ -30,7 +24,6 @@ struct socket_info {
 
 int main(int argc , char *argv[])
 {
-  int children[1000];
   int child_size = 0;
   std::map<int,struct socket_info> sockets;
   std::map<int,struct socket_info>::iterator it;
@@ -50,7 +43,6 @@ int main(int argc , char *argv[])
     std::string port = str.substr(0,mid_index);
     std::string command = str.substr(mid_index+1, str.length() - mid_index);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    std::cout << "sockfd " << sockfd << std::endl;
     if( setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0 )
     {
         perror("setsockopt");
@@ -82,7 +74,7 @@ int main(int argc , char *argv[])
      sockets[sockfd] = temp_sockinfo;
   }
 
-
+  it = sockets.begin();
 
   //while loop forever
   while(true) {
@@ -91,10 +83,11 @@ int main(int argc , char *argv[])
       perror("Server-select() error lol!");
       exit(1);
     }
-    it = sockets.begin();
     /*run through the existing connections looking for data to be read*/
     for(it = sockets.begin(); it!=sockets.end(); it++)
     {
+      std::cout << it->first << std::endl;
+
         if(FD_ISSET(it->first, &rfds))
         { /* we got one... */
              /* handle new connections */
@@ -124,15 +117,22 @@ int main(int argc , char *argv[])
                 exit(1);
               }
               else if (pid > 0){
-              //else
-                //add to children array
+                child_size++;
+                std::cout << "I am the parent of " << child_size << " children" << std::endl;
               }
           }
-
+          //clear the socket set
+          FD_ZERO(&rfds);
+          for(std::map<int,struct socket_info>::iterator it2 = sockets.begin(); it2!=sockets.end(); it2++)
+          {
+          FD_SET(it2->first, &rfds);
+        }
 
 
   }
-
+  else {
+    std::cout << "is not set" << std::endl;
+  }
 }
 }
   //eventually wait on children
